@@ -59,8 +59,25 @@ namespace TestPTP
                 }
                 else
                 {
-                    MessageBox.Show("Error");
+                    HistoryTB.Dispatcher.Invoke(() =>
+                    {
+                        HistoryTB.Text += string.Format("Ошибка отправки сообщения узлу: {0}\n", node.Key);
+                    });
                 }
+            }).Start();
+        }
+
+        private void Button_Click_1(object sender, RoutedEventArgs e)
+        {
+            new Thread(() =>
+            {
+                string nodeKey = NodeKeyTB.Text;
+                bool isConnect = client.ReachConnection(nodeKey);              
+                HistoryTB.Dispatcher.Invoke(() =>
+                {
+                    if (isConnect) HistoryTB.Text += string.Format("Подключение к {0} успешно\n", nodeKey);
+                    else HistoryTB.Text += string.Format("Ошибка подключения к {0}\n", nodeKey);
+                });
             }).Start();
         }
     }

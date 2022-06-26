@@ -19,7 +19,7 @@ namespace GPeerToPeer
         private List<PTPNode> nodes;
         public PTPNode selfNode { get; private set; }
         private TempList<byte[]> conforms;
-        private TempList<byte[]> receivePackets;
+        private Dictionary<byte, TempList<byte[]>> packets;
 
         private PTPClient(int socketPort)
         {
@@ -29,7 +29,10 @@ namespace GPeerToPeer
             socket.SendTimeout = SOCKET_TIMEOUT;
             nodes = new List<PTPNode>();
             conforms = new TempList<byte[]>(2 * SOCKET_TIMEOUT * SOCKET_TIMES_OUT);
-            receivePackets = new TempList<byte[]>(2 * SOCKET_TIMEOUT * SOCKET_TIMES_OUT);
+
+            packets = new Dictionary<byte, TempList<byte[]>>();
+            packets[Act.RECEIVE] = new TempList<byte[]>(SOCKET_TIMEOUT);
+            packets[Act.REACH_CONNECTION_RESPONSE] = new TempList<byte[]>(SOCKET_TIMEOUT);
         }
         public PTPClient(string providerIp, int providerPort, int socketPort) : this(socketPort)
         {
@@ -45,7 +48,7 @@ namespace GPeerToPeer
             if (count > a.Length && count > b.Length) return false;
             for(int i = 0; i < count; i++)
             {
-                if (a[i].Equals(b[i])) return false;
+                if (!a[i].Equals(b[i])) return false;
             }
             return true;
         }
@@ -71,8 +74,28 @@ namespace GPeerToPeer
 
         public void FixNat(PTPNode node)
         {
-            for (int i = 0; i < PACKETS_TO_FIX; i++) SendTo(node, new byte[1] { 0 });
+            for (int i = 0; i < PACKETS_TO_FIX; i++) SendTo(node, new byte[1] { Act.NOTHING });
         }
+        public bool ReachConnection(PTPNode node)
+        {
+            Task t = Task.Run(() =>
+            {
+                byte[] bytes = new byte[BUFFER_SIZE];
+                byte[] myNodeBytes = PTPNode.byteArrayFromKey(node.Key);
+                byte[] message = new byte[myNodeBytes.Length + 1];
+                message[0] = Act.REACH_CONNECTION;
+                while (true)
+                {
+                    Array.ConstrainedCopy(myNodeBytes, 0, message, 1, myNodeBytes.Length);
+                    SendTo(node, message);
+                    if (packets[Act.REACH_CONNECTION_RESPONSE].Get(ref bytes) && FirstEquals(bytes, myNodeBytes, myNodeBytes.Length)) return;
+                    Thread.Sleep(SOCKET_TIMEOUT / 10);
+                }
+            });
+            if (!t.Wait(2 * SOCKET_TIMEOUT * SOCKET_TIMES_OUT)) return false;
+            return true;
+        }
+        public bool ReachConnection(string nodeKey) => ReachConnection(new PTPNode(nodeKey));
 
         public PTPNode GetSelfKey(PTPNode router)
         {
@@ -100,19 +123,15 @@ namespace GPeerToPeer
             allMessage[0] = Act.SEND;
             conform.CopyTo(allMessage, 1);
             message.CopyTo(allMessage, conform.Length + 1);
-            PTPNode? nodeFrom;
+            bool received;
             int times = 0;
             byte[] conformFrom = new byte[CONFORM_SIZE];
             do
             {
                 SendTo(node, allMessage);
-                nodeFrom = ReceiveFrom();
-                if (buffer[0] == Act.RECEIVE)
-                {
-                    Array.ConstrainedCopy(buffer, 1, conformFrom, 0, conformFrom.Length);
-                }
-                if (!(nodeFrom.HasValue && buffer[0] == Act.RECEIVE) && ++times == SOCKET_TIMES_OUT) return false;
-            } while (!nodeFrom.HasValue || !FirstEquals(conformFrom, conform, conform.Length));
+                received = packets[Act.RECEIVE].Get(ref conformFrom);
+                if (!received && ++times == SOCKET_TIMES_OUT) return false;
+            } while (!received || !FirstEquals(conformFrom, conform, conform.Length));
             return true;
         }
 
@@ -126,31 +145,54 @@ namespace GPeerToPeer
                     PTPNode? node = ReceiveFrom();
                     if (node.HasValue)
                     {
-                        if(buffer.Length > 0)
+                        if (buffer.Length > 0)
                         {
-                            byte act = buffer[0];
-                            if(act == Act.SEND)
+                            switch (buffer[0])
                             {
-                                if (buffer.Length > CONFORM_SIZE)
-                                {
-                                    byte[] answer = new byte[CONFORM_SIZE + 1];
-                                    byte[] conform = new byte[CONFORM_SIZE];
-                                    byte[] message = new byte[buffer.Length - CONFORM_SIZE - 1];
-                                    Array.ConstrainedCopy(buffer, 0, answer, 0, answer.Length);
-                                    answer[0] = Act.RECEIVE;
-                                    Array.ConstrainedCopy(buffer, 1, conform, 0, conform.Length);
-                                    Array.ConstrainedCopy(buffer, CONFORM_SIZE + 1, message, 0, message.Length);
-                                    SendTo(node.Value, answer);
-                                    if (!conforms.Contains(conform))
+                                case Act.SEND:
                                     {
-                                        conforms.Add(conform);
-                                        ReceiveMessageFrom?.Invoke(message, node.Value);
+                                        if (buffer.Length > CONFORM_SIZE)
+                                        {
+                                            byte[] answer = new byte[CONFORM_SIZE + 1];
+                                            byte[] conform = new byte[CONFORM_SIZE];
+                                            byte[] message = new byte[buffer.Length - CONFORM_SIZE - 1];
+                                            Array.ConstrainedCopy(buffer, 0, answer, 0, answer.Length);
+                                            answer[0] = Act.RECEIVE;
+                                            Array.ConstrainedCopy(buffer, 1, conform, 0, conform.Length);
+                                            Array.ConstrainedCopy(buffer, CONFORM_SIZE + 1, message, 0, message.Length);
+                                            SendTo(node.Value, answer);
+                                            if (!conforms.Contains(conform))
+                                            {
+                                                conforms.Add(conform);
+                                                ReceiveMessageFrom?.Invoke(message, node.Value);
+                                            }
+                                        }
+                                        break;
                                     }
-                                }
-                            }
-                            else if(act == Act.NOTHING)
-                            {
-                                // do nothing
+                                case Act.NOTHING:
+                                    { 
+                                        break;
+                                    }
+                                case Act.RECEIVE:
+                                    { 
+                                        byte[] conform = new byte[CONFORM_SIZE];
+                                        Array.ConstrainedCopy(buffer, 1, conform, 0, conform.Length);
+                                        packets[Act.RECEIVE].Add(conform);
+                                        break;
+                                    }
+                                case Act.REACH_CONNECTION:
+                                    {
+                                        buffer[0] = Act.REACH_CONNECTION_RESPONSE;
+                                        SendTo(node.Value, buffer);
+                                        break;
+                                    }
+                                case Act.REACH_CONNECTION_RESPONSE:
+                                    {
+                                        byte[] nodeBytes = new byte[PTPNode.PTP_NODE_KEY_SIZE];
+                                        Array.ConstrainedCopy(buffer, 1, nodeBytes, 0, nodeBytes.Length);
+                                        packets[Act.REACH_CONNECTION_RESPONSE].Add(nodeBytes);
+                                        break;
+                                    }
                             }
                         }
                         else if(buffer.Length == 0)
