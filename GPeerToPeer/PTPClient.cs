@@ -12,11 +12,12 @@ namespace GPeerToPeer
         private const int SOCKET_TIMEOUT = 2000;
         private const int SOCKET_TIMES_OUT = 5;
         private const int CONFORM_SIZE = 8;
+        private const int NODE_LIVE_TIME = 100_000;
 
         private byte[] buffer;
         private object bufferLock = new object();
         private Socket socket;
-        private List<PTPNode> nodes;
+        private TempList<PTPNode> nodes;
         public PTPNode selfNode { get; private set; }
         private TempList<byte[]> conforms;
         private Dictionary<byte, TempList<byte[]>> packets;
@@ -27,7 +28,7 @@ namespace GPeerToPeer
             socket.Bind(new IPEndPoint(IPAddress.Any, socketPort));
             socket.ReceiveTimeout = SOCKET_TIMEOUT;
             socket.SendTimeout = SOCKET_TIMEOUT;
-            nodes = new List<PTPNode>();
+            nodes = new TempList<PTPNode>(NODE_LIVE_TIME);
             conforms = new TempList<byte[]>(2 * SOCKET_TIMEOUT * SOCKET_TIMES_OUT);
 
             packets = new Dictionary<byte, TempList<byte[]>>();
@@ -78,6 +79,8 @@ namespace GPeerToPeer
         }
         public bool ReachConnection(PTPNode node)
         {
+            var tokenSource = new CancellationTokenSource();
+            CancellationToken ct = tokenSource.Token;
             Task t = Task.Run(() =>
             {
                 byte[] bytes = new byte[BUFFER_SIZE];
@@ -89,13 +92,38 @@ namespace GPeerToPeer
                     Array.ConstrainedCopy(myNodeBytes, 0, message, 1, myNodeBytes.Length);
                     SendTo(node, message);
                     if (packets[Act.REACH_CONNECTION_RESPONSE].Get(ref bytes) && FirstEquals(bytes, myNodeBytes, myNodeBytes.Length)) return;
-                    Thread.Sleep(SOCKET_TIMEOUT / 10);
                 }
-            });
-            if (!t.Wait(2 * SOCKET_TIMEOUT * SOCKET_TIMES_OUT)) return false;
-            return true;
+            }, ct);
+            bool isManaged = t.Wait(SOCKET_TIMEOUT * SOCKET_TIMES_OUT);
+            tokenSource.Cancel();
+            if (isManaged) return true;
+            return false;
         }
         public bool ReachConnection(string nodeKey) => ReachConnection(new PTPNode(nodeKey));
+
+        public async Task<bool> ReachConnectionAsync(PTPNode node)
+        {
+            var tokenSource = new CancellationTokenSource();
+            CancellationToken ct = tokenSource.Token;
+            Task t = Task.Run(() =>
+            {
+                byte[] bytes = new byte[BUFFER_SIZE];
+                byte[] myNodeBytes = PTPNode.byteArrayFromKey(node.Key);
+                byte[] message = new byte[myNodeBytes.Length + 1];
+                message[0] = Act.REACH_CONNECTION;
+                while (!ct.IsCancellationRequested)
+                {
+                    Array.ConstrainedCopy(myNodeBytes, 0, message, 1, myNodeBytes.Length);
+                    SendTo(node, message);
+                    if (packets[Act.REACH_CONNECTION_RESPONSE].Get(ref bytes) && FirstEquals(bytes, myNodeBytes, myNodeBytes.Length)) return;
+                }
+            }, ct);
+            bool isManaged = await Task.WhenAny(t, Task.Delay(SOCKET_TIMEOUT * SOCKET_TIMES_OUT)) == t;
+            tokenSource.Cancel();
+            if (isManaged) return true;
+            return false;
+        }
+        public async Task<bool> ReachConnectionAsync(string nodeKey) => await ReachConnectionAsync(new PTPNode(nodeKey));
 
         public PTPNode GetSelfKey(PTPNode router)
         {
@@ -133,6 +161,34 @@ namespace GPeerToPeer
                 if (!received && ++times == SOCKET_TIMES_OUT) return false;
             } while (!received || !FirstEquals(conformFrom, conform, conform.Length));
             return true;
+        }
+
+        public async Task<bool> SendMessageToAsync(PTPNode node, byte[] message)
+        {
+            if (!nodes.Contains(node))
+            {
+                nodes.Add(node);
+                FixNat(node);
+            }
+            byte[] conform = new byte[CONFORM_SIZE];
+            Random.Shared.NextBytes(conform);
+            byte[] allMessage = new byte[conform.Length + message.Length + 1];
+            allMessage[0] = Act.SEND;
+            conform.CopyTo(allMessage, 1);
+            message.CopyTo(allMessage, conform.Length + 1);
+
+            return await Task.Run(() => {
+                bool received;
+                int times = 0;
+                byte[] conformFrom = new byte[CONFORM_SIZE];
+                do
+                {
+                    SendTo(node, allMessage);
+                    received = packets[Act.RECEIVE].Get(ref conformFrom);
+                    if (!received && ++times == SOCKET_TIMES_OUT) return false;
+                } while (!received || !FirstEquals(conformFrom, conform, conform.Length));
+                return true; 
+            });
         }
 
         public event IPTPClient.ProcessMessageFromHandler ReceiveMessageFrom;
@@ -200,7 +256,6 @@ namespace GPeerToPeer
                             SendTo(node.Value, PTPNode.byteArrayFromKey(node.Value.Key));
                         }
                     }
-                    else return;
                 }
             }
         }

@@ -1,17 +1,15 @@
-﻿using System;
-
-namespace GPeerToPeer
+﻿namespace GPeerToPeer
 {
     public class TempList<T>
     {
         private Dictionary<DateTime, T> values;
         private object valuesLock;
         private TimeSpan ttl { get; set; }
-        public TempList(long seconds)
+        public TempList(long milliseconds)
         {
             values = new Dictionary<DateTime, T>();
             valuesLock = new object();
-            ttl = TimeSpan.FromSeconds(seconds);
+            ttl = TimeSpan.FromMilliseconds(milliseconds);
         }
         private void DeleteOldValues()
         {
@@ -30,9 +28,11 @@ namespace GPeerToPeer
         }
         public bool Get(ref T value)
         {
+            var tokenSource = new CancellationTokenSource();
+            CancellationToken ct = tokenSource.Token;
             Task<T> t = Task.Run(() =>
             {
-                while (true)
+                while (!ct.IsCancellationRequested)
                 {
                     lock (valuesLock)
                     {
@@ -46,13 +46,16 @@ namespace GPeerToPeer
                         }
                     }
                 }
-            });
-            if (!t.Wait(ttl))
+                return default(T);
+            }, ct);
+            bool isManaged = t.Wait(ttl);
+            tokenSource.Cancel();
+            if (isManaged)
             {
-                return false;
+                value = t.GetAwaiter().GetResult();
+                return true;
             }
-            value = t.GetAwaiter().GetResult();
-            return true;
+            return false;
         }
         public bool Contains(T value)
         {

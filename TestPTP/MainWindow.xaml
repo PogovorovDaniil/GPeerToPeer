@@ -17,7 +17,7 @@
             <RowDefinition/>
             <RowDefinition Height="30px"/>
         </Grid.RowDefinitions>
-        <TextBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="4" x:Name="HistoryTB" IsReadOnly="True"/>
+        <TextBox Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="4" x:Name="HistoryTB" IsReadOnly="True" VerticalScrollBarVisibility="Auto"/>
         <TextBox Grid.Row="1" Grid.Column="0" x:Name="NodeKeyTB"/>
         <TextBox Grid.Row="1" Grid.Column="1" x:Name="MessageTB"/>
         <Button Grid.Row="1" Grid.Column="2" Content="Send" Click="Button_Click"/>
