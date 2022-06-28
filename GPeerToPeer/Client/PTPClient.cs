@@ -1,8 +1,8 @@
 ﻿using System.Net;
 using System.Net.Sockets;
-using System.Text;
+using GPeerToPeer.Constants;
 
-namespace GPeerToPeer
+namespace GPeerToPeer.Client
 {
     public class PTPClient : IPTPClient
     {
@@ -15,12 +15,12 @@ namespace GPeerToPeer
         private const int NODE_LIVE_TIME = 100_000;
 
         private byte[] buffer;
-        private object bufferLock = new object();
-        private Socket socket;
-        private TempList<PTPNode> nodes;
+        private readonly object bufferLock = new object();
+        private readonly Socket socket;
+        private readonly TempList<PTPNode> nodes;
         public PTPNode selfNode { get; private set; }
-        private TempList<byte[]> conforms;
-        private Dictionary<byte, TempList<byte[]>> packets;
+        private readonly TempList<byte[]> conforms;
+        private readonly Dictionary<byte, TempList<byte[]>> packets;
 
         private PTPClient(int socketPort)
         {
@@ -31,9 +31,12 @@ namespace GPeerToPeer
             nodes = new TempList<PTPNode>(NODE_LIVE_TIME);
             conforms = new TempList<byte[]>(2 * SOCKET_TIMEOUT * SOCKET_TIMES_OUT);
 
-            packets = new Dictionary<byte, TempList<byte[]>>();
-            packets[Act.RECEIVE] = new TempList<byte[]>(SOCKET_TIMEOUT);
-            packets[Act.REACH_CONNECTION_RESPONSE] = new TempList<byte[]>(SOCKET_TIMEOUT);
+            packets = new Dictionary<byte, TempList<byte[]>>()
+            {
+                { Act.RECEIVE, new TempList<byte[]>(SOCKET_TIMEOUT) },
+                { Act.REACH_CONNECTION_RESPONSE, new TempList<byte[]>(SOCKET_TIMEOUT) },
+                { Act.KEY_RESPONSE, new TempList<byte[]>(SOCKET_TIMEOUT) }
+            };
         }
         public PTPClient(string providerIp, int providerPort, int socketPort) : this(socketPort)
         {
@@ -44,13 +47,11 @@ namespace GPeerToPeer
             selfNode = GetSelfKey(new PTPNode(providerKey));
         }
 
-        private bool FirstEquals<T>(T[] a, T[] b, int count) where T : IComparable<T>
+        private static bool FirstEquals<T>(T[] a, T[] b, int count) where T : IComparable<T>
         {
             if (count > a.Length && count > b.Length) return false;
-            for(int i = 0; i < count; i++)
-            {
+            for (int i = 0; i < count; i++)
                 if (!a[i].Equals(b[i])) return false;
-            }
             return true;
         }
         private PTPNode? ReceiveFrom()
@@ -61,7 +62,7 @@ namespace GPeerToPeer
                 EndPoint fromEndPoint = new IPEndPoint(IPAddress.Any, 0);
                 int size = socket.ReceiveFrom(buffer, ref fromEndPoint);
                 Array.Resize(ref buffer, size);
-                return new PTPNode((IPEndPoint)fromEndPoint);
+                return new((IPEndPoint)fromEndPoint);
             }
             catch
             {
@@ -84,7 +85,7 @@ namespace GPeerToPeer
             Task t = Task.Run(() =>
             {
                 byte[] bytes = new byte[BUFFER_SIZE];
-                byte[] myNodeBytes = PTPNode.byteArrayFromKey(node.Key);
+                byte[] myNodeBytes = PTPNode.ByteArrayFromKey(node.Key);
                 byte[] message = new byte[myNodeBytes.Length + 1];
                 message[0] = Act.REACH_CONNECTION;
                 while (true)
@@ -108,7 +109,7 @@ namespace GPeerToPeer
             Task t = Task.Run(() =>
             {
                 byte[] bytes = new byte[BUFFER_SIZE];
-                byte[] myNodeBytes = PTPNode.byteArrayFromKey(node.Key);
+                byte[] myNodeBytes = PTPNode.ByteArrayFromKey(node.Key);
                 byte[] message = new byte[myNodeBytes.Length + 1];
                 message[0] = Act.REACH_CONNECTION;
                 while (!ct.IsCancellationRequested)
@@ -125,17 +126,15 @@ namespace GPeerToPeer
         }
         public async Task<bool> ReachConnectionAsync(string nodeKey) => await ReachConnectionAsync(new PTPNode(nodeKey));
 
-        public PTPNode GetSelfKey(PTPNode router)
+        public PTPNode GetSelfKey(PTPNode helper)
         {
             lock (bufferLock)
             {
-                FixNat(router);
-                SendTo(router, new byte[0] { });
-                PTPNode? node;
-                do node = ReceiveFrom();
-                while (!(node.HasValue && node.Value.Key == router.Key));
-                return new PTPNode(PTPNode.keyFromByteArray(buffer));
-            } 
+                FixNat(helper);
+                do SendTo(helper, Array.Empty<byte>());
+                while (!packets[Act.KEY_RESPONSE].Get(ref buffer));
+                return new PTPNode(PTPNode.KeyFromByteArray(buffer));
+            }
         }
 
         public bool SendMessageTo(PTPNode node, byte[] message)
@@ -177,7 +176,8 @@ namespace GPeerToPeer
             conform.CopyTo(allMessage, 1);
             message.CopyTo(allMessage, conform.Length + 1);
 
-            return await Task.Run(() => {
+            return await Task.Run(() =>
+            {
                 bool received;
                 int times = 0;
                 byte[] conformFrom = new byte[CONFORM_SIZE];
@@ -187,7 +187,7 @@ namespace GPeerToPeer
                     received = packets[Act.RECEIVE].Get(ref conformFrom);
                     if (!received && ++times == SOCKET_TIMES_OUT) return false;
                 } while (!received || !FirstEquals(conformFrom, conform, conform.Length));
-                return true; 
+                return true;
             });
         }
 
@@ -226,11 +226,11 @@ namespace GPeerToPeer
                                         break;
                                     }
                                 case Act.NOTHING:
-                                    { 
+                                    {
                                         break;
                                     }
                                 case Act.RECEIVE:
-                                    { 
+                                    {
                                         byte[] conform = new byte[CONFORM_SIZE];
                                         Array.ConstrainedCopy(buffer, 1, conform, 0, conform.Length);
                                         packets[Act.RECEIVE].Add(conform);
@@ -249,11 +249,18 @@ namespace GPeerToPeer
                                         packets[Act.REACH_CONNECTION_RESPONSE].Add(nodeBytes);
                                         break;
                                     }
+                                case Act.KEY_RESPONSE:
+                                    {
+                                        byte[] keyBytes = new byte[PTPNode.PTP_NODE_KEY_SIZE];
+                                        Array.ConstrainedCopy(buffer, 1, keyBytes, 0, keyBytes.Length);
+                                        packets[Act.KEY_RESPONSE].Add(keyBytes);
+                                        break;
+                                    }
                             }
                         }
-                        else if(buffer.Length == 0)
+                        else if (buffer.Length == 0)
                         {
-                            SendTo(node.Value, PTPNode.byteArrayFromKey(node.Value.Key));
+                            SendTo(node.Value, PTPNode.ByteArrayFromKey(node.Value.Key));
                         }
                     }
                 }

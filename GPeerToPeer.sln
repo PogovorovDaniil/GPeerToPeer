@@ -5,7 +5,9 @@ VisualStudioVersion = 17.2.32616.157
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GPeerToPeer", "GPeerToPeer\GPeerToPeer.csproj", "{92983A85-B88F-4C85-8F76-052E9D56B640}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestPTP", "TestPTP\TestPTP.csproj", "{2385ECA3-0575-4628-8AAD-597B4D1E78D9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestPTP", "TestPTP\TestPTP.csproj", "{2385ECA3-0575-4628-8AAD-597B4D1E78D9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GPTP_Helper", "GPTP_Helper\GPTP_Helper.csproj", "{EFEE518B-D53C-41D5-BAF5-D82796222D33}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{2385ECA3-0575-4628-8AAD-597B4D1E78D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2385ECA3-0575-4628-8AAD-597B4D1E78D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2385ECA3-0575-4628-8AAD-597B4D1E78D9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EFEE518B-D53C-41D5-BAF5-D82796222D33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EFEE518B-D53C-41D5-BAF5-D82796222D33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EFEE518B-D53C-41D5-BAF5-D82796222D33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EFEE518B-D53C-41D5-BAF5-D82796222D33}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

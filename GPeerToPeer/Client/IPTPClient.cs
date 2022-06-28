@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace GPeerToPeer
+﻿namespace GPeerToPeer.Client
 {
     public interface IPTPClient
     {

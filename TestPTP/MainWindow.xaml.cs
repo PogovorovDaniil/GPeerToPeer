@@ -1,7 +1,6 @@
-﻿using GPeerToPeer;
+﻿using GPeerToPeer.Client;
 using System;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,7 +9,7 @@ namespace TestPTP
 {
     public partial class MainWindow : Window
     {
-        IPTPClient client;
+        private readonly IPTPClient client;
         public MainWindow()
         {
             InitializeComponent();
@@ -28,7 +27,7 @@ namespace TestPTP
             });
         }
 
-        private async void Button_Click(object sender, RoutedEventArgs e)
+        private async void SendMessageButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button)
             {
@@ -50,7 +49,7 @@ namespace TestPTP
             }
         }
 
-        private async void Button_Click_1(object sender, RoutedEventArgs e)
+        private async void ConnectButton_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button button)
             {

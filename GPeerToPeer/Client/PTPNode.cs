@@ -2,7 +2,7 @@
 using System.Net;
 using System.Text;
 
-namespace GPeerToPeer
+namespace GPeerToPeer.Client
 {
     public struct PTPNode
     {
@@ -47,12 +47,12 @@ namespace GPeerToPeer
 #pragma warning restore CS0618
         }
 
-        internal static string keyFromByteArray(byte[] bytes)
+        internal static string KeyFromByteArray(byte[] bytes)
         {
             return Encoding.UTF8.GetString(bytes).Substring(0, PTP_NODE_KEY_SIZE);
         }
 
-        internal static byte[] byteArrayFromKey(string str)
+        internal static byte[] ByteArrayFromKey(string str)
         {
             return Encoding.UTF8.GetBytes(str);
         }
