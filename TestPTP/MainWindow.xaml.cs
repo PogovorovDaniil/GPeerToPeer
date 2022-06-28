@@ -43,7 +43,10 @@ namespace TestPTP
                     PTPNode node = new PTPNode(NodeKeyTB.Text);
                     string message = MessageTB.Text;
                     if (await client.SendMessageToAsync(node, Encoding.UTF8.GetBytes(message)))
-                        WriteToEndHistory(string.Format("{0}: {1}", "Me", message));
+                    {
+                        WriteToEndHistory(string.Format("Отправлено: {0}", message));
+                        MessageTB.Text = "";
+                    }
                     else
                         WriteToEndHistory(string.Format("Ошибка отправки сообщения узлу: {0}", node.Key));
                 }
