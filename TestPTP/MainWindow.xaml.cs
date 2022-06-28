@@ -20,10 +20,16 @@ namespace TestPTP
             Task.Run(client.Work);
         }
 
+        private void WriteToEndHistory(string str)
+        {
+            HistoryTB.Text += str + "\n";
+            HistoryTB.ScrollToEnd();
+        }
+
         private void Client_ReceiveMessageFrom(byte[] message, PTPNode node)
         {
             HistoryTB.Dispatcher.Invoke(() => {
-                HistoryTB.Text += string.Format("{0}: {1}\n", node.Key, Encoding.UTF8.GetString(message));
+                WriteToEndHistory(string.Format("{0}: {1}", node.Key, Encoding.UTF8.GetString(message)));
             });
         }
 
@@ -36,14 +42,14 @@ namespace TestPTP
                 {
                     PTPNode node = new PTPNode(NodeKeyTB.Text);
                     string message = MessageTB.Text;
-                    if (await client.SendMessageToAsync(node, Encoding.UTF8.GetBytes(message))) 
-                        HistoryTB.Text += string.Format("{0}: {1}\n", "Me", message);
-                    else 
-                        HistoryTB.Text += string.Format("Ошибка отправки сообщения узлу: {0}\n", node.Key);
+                    if (await client.SendMessageToAsync(node, Encoding.UTF8.GetBytes(message)))
+                        WriteToEndHistory(string.Format("{0}: {1}", "Me", message));
+                    else
+                        WriteToEndHistory(string.Format("Ошибка отправки сообщения узлу: {0}", node.Key));
                 }
                 catch (Exception ex)
                 {
-                    HistoryTB.Text += string.Format("Ошибка: {0}\n", ex);
+                    WriteToEndHistory(string.Format("Ошибка: {0}", ex));
                 }
                 button.IsEnabled = true;
             }
@@ -58,12 +64,12 @@ namespace TestPTP
                 {
                     string nodeKey = NodeKeyTB.Text;
                     bool isConnect = await client.ReachConnectionAsync(nodeKey);
-                    if (isConnect) HistoryTB.Text += string.Format("Подключение к {0} успешно\n", nodeKey);
-                    else HistoryTB.Text += string.Format("Ошибка подключения к {0}\n", nodeKey);
+                    if (isConnect) WriteToEndHistory(string.Format("Подключение к {0} успешно", nodeKey));
+                    else WriteToEndHistory(string.Format("Ошибка подключения к {0}", nodeKey));
                 }
                 catch(Exception ex)
                 {
-                    HistoryTB.Text += string.Format("Ошибка: {0}\n", ex);
+                    WriteToEndHistory(string.Format("Ошибка: {0}", ex));
                 }
                 button.IsEnabled = true;
             }
