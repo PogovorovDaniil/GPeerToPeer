@@ -40,11 +40,11 @@ namespace GPeerToPeer.Client
         }
         public PTPClient(string providerIp, int providerPort, int socketPort) : this(socketPort)
         {
-            selfNode = GetSelfKey(new PTPNode(providerIp, providerPort));
+            selfNode = RawGetSelfKey(new PTPNode(providerIp, providerPort));
         }
         public PTPClient(string providerKey, int socketPort) : this(socketPort)
         {
-            selfNode = GetSelfKey(new PTPNode(providerKey));
+            selfNode = RawGetSelfKey(new PTPNode(providerKey));
         }
 
         private static bool FirstEquals<T>(T[] a, T[] b, int count) where T : IComparable<T>
@@ -126,6 +126,20 @@ namespace GPeerToPeer.Client
         }
         public async Task<bool> ReachConnectionAsync(string nodeKey) => await ReachConnectionAsync(new PTPNode(nodeKey));
 
+        private PTPNode RawGetSelfKey(PTPNode helper)
+        {
+            lock (bufferLock)
+            {
+                FixNat(helper);
+                SendTo(helper, Array.Empty<byte>());
+                PTPNode? node;
+                do node = ReceiveFrom();
+                while (!(node.HasValue && node.Value.Key == helper.Key));
+                byte[] keyBytes = new byte[PTPNode.PTP_NODE_KEY_SIZE];
+                Array.ConstrainedCopy(buffer, 1, keyBytes, 0, keyBytes.Length);
+                return new PTPNode(PTPNode.KeyFromByteArray(keyBytes));
+            }
+        }
         public PTPNode GetSelfKey(PTPNode helper)
         {
             lock (bufferLock)
@@ -136,6 +150,7 @@ namespace GPeerToPeer.Client
                 return new PTPNode(PTPNode.KeyFromByteArray(buffer));
             }
         }
+
 
         public bool SendMessageTo(PTPNode node, byte[] message)
         {
@@ -260,7 +275,10 @@ namespace GPeerToPeer.Client
                         }
                         else if (buffer.Length == 0)
                         {
-                            SendTo(node.Value, PTPNode.ByteArrayFromKey(node.Value.Key));
+                            byte[] keyBytesToSend = new byte[PTPNode.PTP_NODE_KEY_SIZE + 1];
+                            Array.ConstrainedCopy(PTPNode.ByteArrayFromKey(node.Value.Key), 0, keyBytesToSend, 1, keyBytesToSend.Length);
+                            keyBytesToSend[0] = Act.KEY_RESPONSE;
+                            SendTo(node.Value, keyBytesToSend);
                         }
                     }
                 }
