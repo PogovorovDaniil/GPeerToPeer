@@ -26,6 +26,13 @@
                 values.Add(DateTime.UtcNow, value);
             }
         }
+        public void Delete(T value)
+        {
+            foreach (DateTime time in values.Keys)
+            {
+                if (values[time].Equals(value)) values.Remove(time);
+            }
+        }
         public bool Get(ref T value)
         {
             var tokenSource = new CancellationTokenSource();
@@ -67,6 +74,17 @@
                     if (value1.Equals(value)) return true;
                 }
                 return false;
+            }
+        }
+
+        public void Foreach(Action<T> action) 
+        {
+            lock (valuesLock)
+            {
+                foreach (T value in values.Values)
+                {
+                    action(value);
+                }
             }
         }
     }

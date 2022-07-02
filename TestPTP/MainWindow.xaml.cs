@@ -16,8 +16,13 @@ namespace TestPTP
             client = new PTPClient("194.61.3.168", 22345, 22345);
             client.ReceiveMessageFrom += Client_ReceiveMessageFrom;
             HistoryTB.Text += client.selfNode.Key + "\n";
-
+            Closed += MainWindow_Closed;
             Task.Run(client.Work);
+        }
+
+        private void MainWindow_Closed(object? sender, EventArgs e)
+        {
+            client.Close();
         }
 
         private void WriteToEndHistory(string str)

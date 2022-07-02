@@ -8,5 +8,6 @@
         public const byte REACH_CONNECTION = 3;
         public const byte REACH_CONNECTION_RESPONSE = 4;
         public const byte KEY_RESPONSE = 5;
+        public const byte CLOSE = 6;
     }
 }

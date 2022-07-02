@@ -209,6 +209,7 @@ namespace GPeerToPeer.Client
         public event IPTPClient.ProcessMessageFromHandler ReceiveMessageFrom;
         public void Work()
         {
+            DateTime lastTime = DateTime.UtcNow;
             while (true)
             {
                 lock (bufferLock)
@@ -242,6 +243,8 @@ namespace GPeerToPeer.Client
                                     }
                                 case Act.NOTHING:
                                     {
+                                        if (!nodes.Contains(node.Value))
+                                            nodes.Add(node.Value);
                                         break;
                                     }
                                 case Act.RECEIVE:
@@ -271,6 +274,10 @@ namespace GPeerToPeer.Client
                                         packets[Act.KEY_RESPONSE].Add(keyBytes);
                                         break;
                                     }
+                                case Act.CLOSE:
+                                    {
+                                        break;
+                                    }
                             }
                         }
                         else if (buffer.Length == 0)
@@ -281,8 +288,22 @@ namespace GPeerToPeer.Client
                             SendTo(node.Value, keyBytesToSend);
                         }
                     }
+                    if(DateTime.UtcNow - lastTime > TimeSpan.FromMilliseconds(NODE_LIVE_TIME / 2))
+                    {
+                        lastTime = DateTime.UtcNow;
+                        nodes.Foreach(x => {
+                            FixNat(x);
+                        });
+                    }
                 }
             }
+        }
+
+        public void Close()
+        {
+            nodes.Foreach(node => {
+                SendMessageTo(node, new byte[] { Act.CLOSE });
+            });
         }
     }
 }
