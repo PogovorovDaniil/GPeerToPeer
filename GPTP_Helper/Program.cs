@@ -21,7 +21,7 @@ while (true)
             byte[] bytes = Encoding.UTF8.GetBytes(from);
             Array.ConstrainedCopy(bytes, 0, buffer, 1, bytes.Length);
             Array.Resize(ref buffer, bytes.Length + 1);
-            buffer[0] = 5;
+            buffer[0] = 6; // KEY_RESPONSE
             socket.SendTo(buffer, endPoint);
         }
     }

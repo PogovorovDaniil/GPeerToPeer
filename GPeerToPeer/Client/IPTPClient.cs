@@ -7,11 +7,14 @@
         public bool ReachConnection(PTPNode node);
         public bool ReachConnection(string nodeKey);
         public Task<bool> ReachConnectionAsync(string nodeKey);
-        public bool SendMessageTo(PTPNode ptpnode, byte[] message);
+        public bool SendMessageTo(PTPNode node, byte[] message);
         public void Close();
-        public Task<bool> SendMessageToAsync(PTPNode ptpnode, byte[] message);
+        public Task<bool> SendMessageToAsync(PTPNode node, byte[] message);
         public delegate void ProcessMessageFromHandler(byte[] message, PTPNode node);
         public event ProcessMessageFromHandler ReceiveMessageFrom;
+
+        public delegate void LogPacketHandler(string message, PTPNode node);
+        public event LogPacketHandler Log;
         public void Work();
     }
 }

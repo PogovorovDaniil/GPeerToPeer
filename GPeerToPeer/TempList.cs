@@ -4,18 +4,18 @@
     {
         private readonly Dictionary<DateTime, T> values;
         private readonly object valuesLock;
-        private TimeSpan Ttl { get; set; }
+        private TimeSpan Ttd { get; set; }
         public TempList(long milliseconds)
         {
             values = new Dictionary<DateTime, T>();
             valuesLock = new object();
-            Ttl = TimeSpan.FromMilliseconds(milliseconds);
+            Ttd = TimeSpan.FromMilliseconds(milliseconds);
         }
         private void DeleteOldValues()
         {
             foreach (DateTime time in values.Keys)
             {
-                if (time + Ttl < DateTime.UtcNow) values.Remove(time);
+                if (time + Ttd < DateTime.UtcNow) values.Remove(time);
             }
         }
         public void Add(T value)
@@ -55,7 +55,7 @@
                 }
                 return default;
             }, ct);
-            bool isManaged = t.Wait(Ttl);
+            bool isManaged = t.Wait(Ttd);
             tokenSource.Cancel();
             if (isManaged)
             {
