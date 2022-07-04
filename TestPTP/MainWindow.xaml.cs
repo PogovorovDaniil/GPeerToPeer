@@ -90,5 +90,14 @@ namespace TestPTP
                 button.IsEnabled = true;
             }
         }
+
+        private void SendRawMessageButton_Click(object sender, RoutedEventArgs e)
+        {
+            PTPNode node = new PTPNode(NodeKeyTB.Text);
+            string message = MessageTB.Text;
+            client.SendNoReceiveMessageTo(node, Encoding.UTF8.GetBytes(message));
+            WriteToEndHistory(string.Format("Отправлено: {0}", message));
+            MessageTB.Text = "";
+        }
     }
 }

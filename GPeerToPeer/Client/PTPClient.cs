@@ -172,6 +172,14 @@ namespace GPeerToPeer.Client
             return true;
         }
 
+        public void SendNoReceiveMessageTo(PTPNode node, byte[] message)
+        {
+            byte[] allMessage = new byte[message.Length + 1];
+            allMessage[0] = Act.SEND_NO_RECEIVE;
+            message.CopyTo(allMessage, 1);
+            SendTo(node, allMessage);
+        }
+
         public async Task<bool> SendMessageToAsync(PTPNode node, byte[] message)
         {
             byte[] conform = new byte[CONFORM_SIZE];
@@ -235,12 +243,9 @@ namespace GPeerToPeer.Client
                                     }
                                 case Act.SEND_NO_RECEIVE:
                                     {
-                                        if (buffer.Length > CONFORM_SIZE)
-                                        {
-                                            byte[] message = new byte[buffer.Length - 1];
-                                            Array.ConstrainedCopy(buffer, 1, message, 0, message.Length);
-                                            ReceiveMessageFrom?.Invoke(message, node.Value);
-                                        }
+                                        byte[] message = new byte[buffer.Length - 1];
+                                        Array.ConstrainedCopy(buffer, 1, message, 0, message.Length);
+                                        ReceiveMessageFrom?.Invoke(message, node.Value);
                                         //Log?.Invoke("SEND_NO_RECEIVE", node.Value);
                                         break;
                                     }

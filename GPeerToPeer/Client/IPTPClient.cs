@@ -8,6 +8,7 @@
         public bool ReachConnection(string nodeKey);
         public Task<bool> ReachConnectionAsync(string nodeKey);
         public bool SendMessageTo(PTPNode node, byte[] message);
+        public void SendNoReceiveMessageTo(PTPNode node, byte[] bytes);
         public void Close();
         public Task<bool> SendMessageToAsync(PTPNode node, byte[] message);
         public delegate void ProcessMessageFromHandler(byte[] message, PTPNode node);
