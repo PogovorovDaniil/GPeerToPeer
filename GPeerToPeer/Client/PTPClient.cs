@@ -8,11 +8,13 @@ namespace GPeerToPeer.Client
     {
         private const int MAX_MESSAGE_SIZE = 1024;
         private const int BUFFER_SIZE = MAX_MESSAGE_SIZE + 8 + 1;
-        private const int PACKETS_TO_FIX = 1; //20;
+        private const int PACKETS_TO_FIX = 1;
         private const int SOCKET_TIMEOUT = 2000;
         private const int SOCKET_TIMES_OUT = 5;
         private const int CONFORM_SIZE = 8;
         private const int NODE_LIVE_TIME = 100_000;
+        private const int CHANNEL_COUNT = 16;
+        private const int PACKET_LIVE_TIME = 60_000;
 
         private byte[] buffer;
         private readonly object bufferLock = new object();
@@ -21,6 +23,9 @@ namespace GPeerToPeer.Client
         public PTPNode selfNode { get; private set; }
         private readonly TempList<byte[]> conforms;
         private readonly Dictionary<byte, TempList<byte[]>> packets;
+
+        private readonly TempList<(byte[], PTPNode)>[] receivedMessages;
+        private readonly TempList<(byte[], PTPNode)>[] receivedMessagesWithoutConfirmation;
 
         private PTPClient(int socketPort)
         {
@@ -37,6 +42,11 @@ namespace GPeerToPeer.Client
                 { Act.REACH_CONNECTION_RESPONSE, new TempList<byte[]>(SOCKET_TIMEOUT) },
                 { Act.KEY_RESPONSE, new TempList<byte[]>(SOCKET_TIMEOUT) }
             };
+
+            receivedMessages = new TempList<(byte[], PTPNode)>[CHANNEL_COUNT];
+            for (int i = 0; i < CHANNEL_COUNT; i++) receivedMessages[i] = new TempList<(byte[], PTPNode)>(PACKET_LIVE_TIME);
+            receivedMessagesWithoutConfirmation = new TempList<(byte[], PTPNode)>[CHANNEL_COUNT];
+            for (int i = 0; i < CHANNEL_COUNT; i++) receivedMessagesWithoutConfirmation[i] = new TempList<(byte[], PTPNode)>(PACKET_LIVE_TIME);
         }
         public PTPClient(string providerIp, int providerPort, int socketPort) : this(socketPort)
         {
@@ -74,9 +84,9 @@ namespace GPeerToPeer.Client
             socket.SendTo(bytes, node.EndPoint);
         }
 
-        public void FixNat(PTPNode node)
+        public void UpdateNat(PTPNode node)
         {
-            for (int i = 0; i < PACKETS_TO_FIX; i++) SendTo(node, new byte[1] { Act.FIX });
+            for (int i = 0; i < PACKETS_TO_FIX; i++) SendTo(node, new byte[1] { Act.UPDATE_NAT });
         }
         public bool ReachConnection(PTPNode node)
         {
@@ -130,7 +140,7 @@ namespace GPeerToPeer.Client
         {
             lock (bufferLock)
             {
-                FixNat(helper);
+                UpdateNat(helper);
                 SendTo(helper, Array.Empty<byte>());
                 PTPNode? node;
                 do node = ReceiveFrom();
@@ -144,7 +154,7 @@ namespace GPeerToPeer.Client
         {
             lock (bufferLock)
             {
-                FixNat(helper);
+                UpdateNat(helper);
                 do SendTo(helper, Array.Empty<byte>());
                 while (!packets[Act.KEY_RESPONSE].Get(ref buffer));
                 return new PTPNode(PTPNode.KeyFromByteArray(buffer));
@@ -152,14 +162,15 @@ namespace GPeerToPeer.Client
         }
 
 
-        public bool SendMessageTo(PTPNode node, byte[] message)
+        public bool SendMessageTo(PTPNode node, byte[] message, byte channel = 0)
         {
             byte[] conform = new byte[CONFORM_SIZE];
             Random.Shared.NextBytes(conform);
-            byte[] allMessage = new byte[conform.Length + message.Length + 1];
+            byte[] allMessage = new byte[conform.Length + message.Length + 1 + 1];
             allMessage[0] = Act.SEND;
-            conform.CopyTo(allMessage, 1);
-            message.CopyTo(allMessage, conform.Length + 1);
+            allMessage[1] = channel;
+            conform.CopyTo(allMessage, 2);
+            message.CopyTo(allMessage, conform.Length + 2);
             bool received;
             int times = 0;
             byte[] conformFrom = new byte[CONFORM_SIZE];
@@ -172,22 +183,24 @@ namespace GPeerToPeer.Client
             return true;
         }
 
-        public void SendMessageWithoutConfirmationTo(PTPNode node, byte[] message)
+        public void SendMessageWithoutConfirmationTo(PTPNode node, byte[] message, byte channel = 0)
         {
-            byte[] allMessage = new byte[message.Length + 1];
+            byte[] allMessage = new byte[message.Length + 1 + 1];
             allMessage[0] = Act.SEND_NO_RECEIVE;
-            message.CopyTo(allMessage, 1);
+            allMessage[1] = channel;
+            message.CopyTo(allMessage, 2);
             SendTo(node, allMessage);
         }
 
-        public async Task<bool> SendMessageToAsync(PTPNode node, byte[] message)
+        public async Task<bool> SendMessageToAsync(PTPNode node, byte[] message, byte channel = 0)
         {
             byte[] conform = new byte[CONFORM_SIZE];
             Random.Shared.NextBytes(conform);
-            byte[] allMessage = new byte[conform.Length + message.Length + 1];
+            byte[] allMessage = new byte[conform.Length + message.Length + 1 + 1];
             allMessage[0] = Act.SEND;
-            conform.CopyTo(allMessage, 1);
-            message.CopyTo(allMessage, conform.Length + 1);
+            allMessage[1] = channel;
+            conform.CopyTo(allMessage, 2);
+            message.CopyTo(allMessage, conform.Length + 2);
             return await Task.Run(() =>
             {
                 bool received;
@@ -203,7 +216,6 @@ namespace GPeerToPeer.Client
             });
         }
 
-        public event IPTPClient.ProcessMessageFromHandler ReceiveMessageFrom;
 #if DEBUG
         public event IPTPClient.LogPacketHandler Log;
 #endif
@@ -226,18 +238,19 @@ namespace GPeerToPeer.Client
                                     {
                                         if (buffer.Length > CONFORM_SIZE)
                                         {
-                                            byte[] answer = new byte[CONFORM_SIZE + 1];
+                                            byte[] answer = new byte[CONFORM_SIZE + 2];
                                             byte[] conform = new byte[CONFORM_SIZE];
-                                            byte[] message = new byte[buffer.Length - CONFORM_SIZE - 1];
+                                            byte[] message = new byte[buffer.Length - CONFORM_SIZE - 2];
                                             Array.ConstrainedCopy(buffer, 0, answer, 0, answer.Length);
                                             answer[0] = Act.RECEIVE;
-                                            Array.ConstrainedCopy(buffer, 1, conform, 0, conform.Length);
-                                            Array.ConstrainedCopy(buffer, CONFORM_SIZE + 1, message, 0, message.Length);
+                                            byte channel = buffer[1];
+                                            Array.ConstrainedCopy(buffer, 2, conform, 0, conform.Length);
+                                            Array.ConstrainedCopy(buffer, CONFORM_SIZE + 2, message, 0, message.Length);
                                             SendTo(node.Value, answer);
                                             if (!conforms.Contains(conform))
                                             {
                                                 conforms.Add(conform);
-                                                ReceiveMessageFrom?.Invoke(message, node.Value);
+                                                receivedMessages[channel].Add((message, node.Value));
                                             }
                                         }
 #if DEBUG
@@ -247,9 +260,10 @@ namespace GPeerToPeer.Client
                                     }
                                 case Act.SEND_NO_RECEIVE:
                                     {
-                                        byte[] message = new byte[buffer.Length - 1];
-                                        Array.ConstrainedCopy(buffer, 1, message, 0, message.Length);
-                                        ReceiveMessageFrom?.Invoke(message, node.Value);
+                                        byte[] message = new byte[buffer.Length - 2];
+                                        byte channel = buffer[1];
+                                        Array.ConstrainedCopy(buffer, 2, message, 0, message.Length);
+                                        receivedMessagesWithoutConfirmation[channel].Add((message, node.Value));
 #if DEBUG
                                         Log?.Invoke("SEND_NO_RECEIVE", node.Value);
 #endif
@@ -265,7 +279,7 @@ namespace GPeerToPeer.Client
                                 case Act.RECEIVE:
                                     {
                                         byte[] conform = new byte[CONFORM_SIZE];
-                                        Array.ConstrainedCopy(buffer, 1, conform, 0, conform.Length);
+                                        Array.ConstrainedCopy(buffer, 2, conform, 0, conform.Length);
                                         packets[Act.RECEIVE].Add(conform);
 #if DEBUG
                                         Log?.Invoke("RECEIVE", node.Value);
@@ -301,12 +315,12 @@ namespace GPeerToPeer.Client
 #endif
                                         break;
                                     }
-                                case Act.FIX:
+                                case Act.UPDATE_NAT:
                                     {
                                         if (!nodes.Contains(node.Value))
                                             nodes.Add(node.Value);
 #if DEBUG
-                                        Log?.Invoke("FIX", node.Value);
+                                        Log?.Invoke("UPDATE_NAT", node.Value);
 #endif
                                         break;
                                     }
@@ -332,7 +346,7 @@ namespace GPeerToPeer.Client
                     {
                         lastTime = DateTime.UtcNow;
                         nodes.Foreach(x => {
-                            FixNat(x);
+                            UpdateNat(x);
                         });
                     }
                 }
@@ -344,6 +358,31 @@ namespace GPeerToPeer.Client
             nodes.Foreach(node => {
                 SendTo(node, new byte[] { Act.CLOSE });
             });
+            socket.Close();
+        }
+
+        public bool ReceiveMessageFrom(ref PTPNode node, ref byte[] message, byte channel = 0)
+        {
+            (byte[], PTPNode) pair = (null, new PTPNode());
+            if(receivedMessages[channel].GetNoWait(ref pair))
+            {
+                message = pair.Item1;
+                node = pair.Item2;
+                return true;
+            }
+            return false;
+        }
+
+        public bool ReceiveMessageWithoutConfirmationFrom(ref PTPNode node, ref byte[] message, byte channel = 0)
+        {
+            (byte[], PTPNode) pair = (null, new PTPNode());
+            if (receivedMessagesWithoutConfirmation[channel].GetNoWait(ref pair))
+            {
+                message = pair.Item1;
+                node = pair.Item2;
+                return true;
+            }
+            return false;
         }
     }
 }

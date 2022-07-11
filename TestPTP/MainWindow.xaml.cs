@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 
 namespace TestPTP
 {
@@ -14,12 +15,16 @@ namespace TestPTP
         {
             InitializeComponent();
             client = new PTPClient("194.61.3.168", 22345, 22345);
-            client.ReceiveMessageFrom += Client_ReceiveMessageFrom;
 #if DEBUG
             client.Log += Client_Log;
 #endif
             HistoryTB.Text += client.selfNode.Key + "\n";
             Closed += MainWindow_Closed;
+
+            DispatcherTimer dispatcherTimer = new DispatcherTimer();
+            dispatcherTimer.Tick += Client_ReceiveMessageFrom;
+            dispatcherTimer.Interval = TimeSpan.FromMilliseconds(200);
+            dispatcherTimer.Start();
             Task.Run(client.Work);
         }
 
@@ -43,11 +48,20 @@ namespace TestPTP
             HistoryTB.ScrollToEnd();
         }
 
-        private void Client_ReceiveMessageFrom(byte[] message, PTPNode node)
+        private void Client_ReceiveMessageFrom(object? sender, EventArgs e)
         {
-            HistoryTB.Dispatcher.Invoke(() => {
+            byte[] message = null;
+            PTPNode node = new PTPNode();
+            while (client.ReceiveMessageFrom(ref node, ref message))
+            {
                 WriteToEndHistory(string.Format("{0}: {1}", node.Key, Encoding.UTF8.GetString(message)));
-            });
+            }
+
+            while (client.ReceiveMessageWithoutConfirmationFrom(ref node, ref message))
+            {
+                WriteToEndHistory(string.Format("RAW {0}: {1}", node.Key, Encoding.UTF8.GetString(message)));
+            }
+
         }
 
         private async void SendMessageButton_Click(object sender, RoutedEventArgs e)

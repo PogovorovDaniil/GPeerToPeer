@@ -64,6 +64,21 @@
             }
             return false;
         }
+        public bool GetNoWait(ref T value)
+        {
+            lock (valuesLock)
+            {
+                DeleteOldValues();
+                if (values.Count > 0)
+                {
+                    DateTime minDateTime = values.Min(x => x.Key);
+                    value = values[minDateTime];
+                    values.Remove(minDateTime);
+                    return true;
+                }
+            }
+            return false;
+        }
         public bool Contains(T value)
         {
             lock (valuesLock)
