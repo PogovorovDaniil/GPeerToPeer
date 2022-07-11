@@ -99,7 +99,7 @@ namespace TestPTP
         {
             PTPNode node = new PTPNode(NodeKeyTB.Text);
             string message = MessageTB.Text;
-            client.SendNoReceiveMessageTo(node, Encoding.UTF8.GetBytes(message));
+            client.SendMessageWithoutConfirmationTo(node, Encoding.UTF8.GetBytes(message));
             WriteToEndHistory(string.Format("Отправлено: {0}", message));
             MessageTB.Text = "";
         }

@@ -172,7 +172,7 @@ namespace GPeerToPeer.Client
             return true;
         }
 
-        public void SendNoReceiveMessageTo(PTPNode node, byte[] message)
+        public void SendMessageWithoutConfirmationTo(PTPNode node, byte[] message)
         {
             byte[] allMessage = new byte[message.Length + 1];
             allMessage[0] = Act.SEND_NO_RECEIVE;
@@ -204,7 +204,7 @@ namespace GPeerToPeer.Client
         }
 
         public event IPTPClient.ProcessMessageFromHandler ReceiveMessageFrom;
-#if DEGUB
+#if DEBUG
         public event IPTPClient.LogPacketHandler Log;
 #endif
 
@@ -240,7 +240,7 @@ namespace GPeerToPeer.Client
                                                 ReceiveMessageFrom?.Invoke(message, node.Value);
                                             }
                                         }
-#if DEGUB
+#if DEBUG
                                         Log?.Invoke("SEND", node.Value);
 #endif
                                         break;
@@ -250,14 +250,14 @@ namespace GPeerToPeer.Client
                                         byte[] message = new byte[buffer.Length - 1];
                                         Array.ConstrainedCopy(buffer, 1, message, 0, message.Length);
                                         ReceiveMessageFrom?.Invoke(message, node.Value);
-#if DEGUB
+#if DEBUG
                                         Log?.Invoke("SEND_NO_RECEIVE", node.Value);
 #endif
                                         break;
                                     }
                                 case Act.NOTHING:
                                     {
-#if DEGUB
+#if DEBUG
                                         Log?.Invoke("NOTHING", node.Value);
 #endif
                                         break;
@@ -267,7 +267,7 @@ namespace GPeerToPeer.Client
                                         byte[] conform = new byte[CONFORM_SIZE];
                                         Array.ConstrainedCopy(buffer, 1, conform, 0, conform.Length);
                                         packets[Act.RECEIVE].Add(conform);
-#if DEGUB
+#if DEBUG
                                         Log?.Invoke("RECEIVE", node.Value);
 #endif
                                         break;
@@ -276,7 +276,7 @@ namespace GPeerToPeer.Client
                                     {
                                         buffer[0] = Act.REACH_CONNECTION_RESPONSE;
                                         SendTo(node.Value, buffer);
-#if DEGUB
+#if DEBUG
                                         Log?.Invoke("REACH_CONNECTION", node.Value);
 #endif
                                         break;
@@ -286,7 +286,7 @@ namespace GPeerToPeer.Client
                                         byte[] nodeBytes = new byte[PTPNode.PTP_NODE_KEY_SIZE];
                                         Array.ConstrainedCopy(buffer, 1, nodeBytes, 0, nodeBytes.Length);
                                         packets[Act.REACH_CONNECTION_RESPONSE].Add(nodeBytes);
-#if DEGUB
+#if DEBUG
                                         Log?.Invoke("REACH_CONNECTION_RESPONSE", node.Value);
 #endif
                                         break;
@@ -296,7 +296,7 @@ namespace GPeerToPeer.Client
                                         byte[] keyBytes = new byte[PTPNode.PTP_NODE_KEY_SIZE];
                                         Array.ConstrainedCopy(buffer, 1, keyBytes, 0, keyBytes.Length);
                                         packets[Act.KEY_RESPONSE].Add(keyBytes);
-#if DEGUB
+#if DEBUG
                                         Log?.Invoke("KEY_RESPONSE", node.Value);
 #endif
                                         break;
@@ -305,7 +305,7 @@ namespace GPeerToPeer.Client
                                     {
                                         if (!nodes.Contains(node.Value))
                                             nodes.Add(node.Value);
-#if DEGUB
+#if DEBUG
                                         Log?.Invoke("FIX", node.Value);
 #endif
                                         break;
@@ -313,7 +313,7 @@ namespace GPeerToPeer.Client
                                 case Act.CLOSE:
                                     {
                                         nodes.Delete(node.Value);
-#if DEGUB
+#if DEBUG
                                         Log?.Invoke("CLOSE", node.Value);
 #endif
                                         break;
@@ -328,7 +328,7 @@ namespace GPeerToPeer.Client
                             SendTo(node.Value, keyBytesToSend);
                         }
                     }
-                    if(DateTime.UtcNow - lastTime > TimeSpan.FromMilliseconds(NODE_LIVE_TIME / 10))
+                    if(DateTime.UtcNow - lastTime > TimeSpan.FromMilliseconds(NODE_LIVE_TIME / 4))
                     {
                         lastTime = DateTime.UtcNow;
                         nodes.Foreach(x => {
