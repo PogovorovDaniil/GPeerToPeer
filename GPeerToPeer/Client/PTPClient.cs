@@ -204,7 +204,9 @@ namespace GPeerToPeer.Client
         }
 
         public event IPTPClient.ProcessMessageFromHandler ReceiveMessageFrom;
+#if DEGUB
         public event IPTPClient.LogPacketHandler Log;
+#endif
 
         public void Work()
         {
@@ -238,7 +240,9 @@ namespace GPeerToPeer.Client
                                                 ReceiveMessageFrom?.Invoke(message, node.Value);
                                             }
                                         }
-                                        //Log?.Invoke("SEND", node.Value);
+#if DEGUB
+                                        Log?.Invoke("SEND", node.Value);
+#endif
                                         break;
                                     }
                                 case Act.SEND_NO_RECEIVE:
@@ -246,12 +250,16 @@ namespace GPeerToPeer.Client
                                         byte[] message = new byte[buffer.Length - 1];
                                         Array.ConstrainedCopy(buffer, 1, message, 0, message.Length);
                                         ReceiveMessageFrom?.Invoke(message, node.Value);
-                                        //Log?.Invoke("SEND_NO_RECEIVE", node.Value);
+#if DEGUB
+                                        Log?.Invoke("SEND_NO_RECEIVE", node.Value);
+#endif
                                         break;
                                     }
                                 case Act.NOTHING:
                                     {
-                                        //Log?.Invoke("NOTHING", node.Value);
+#if DEGUB
+                                        Log?.Invoke("NOTHING", node.Value);
+#endif
                                         break;
                                     }
                                 case Act.RECEIVE:
@@ -259,14 +267,18 @@ namespace GPeerToPeer.Client
                                         byte[] conform = new byte[CONFORM_SIZE];
                                         Array.ConstrainedCopy(buffer, 1, conform, 0, conform.Length);
                                         packets[Act.RECEIVE].Add(conform);
-                                        //Log?.Invoke("RECEIVE", node.Value);
+#if DEGUB
+                                        Log?.Invoke("RECEIVE", node.Value);
+#endif
                                         break;
                                     }
                                 case Act.REACH_CONNECTION:
                                     {
                                         buffer[0] = Act.REACH_CONNECTION_RESPONSE;
                                         SendTo(node.Value, buffer);
-                                        //Log?.Invoke("REACH_CONNECTION", node.Value);
+#if DEGUB
+                                        Log?.Invoke("REACH_CONNECTION", node.Value);
+#endif
                                         break;
                                     }
                                 case Act.REACH_CONNECTION_RESPONSE:
@@ -274,7 +286,9 @@ namespace GPeerToPeer.Client
                                         byte[] nodeBytes = new byte[PTPNode.PTP_NODE_KEY_SIZE];
                                         Array.ConstrainedCopy(buffer, 1, nodeBytes, 0, nodeBytes.Length);
                                         packets[Act.REACH_CONNECTION_RESPONSE].Add(nodeBytes);
-                                        //Log?.Invoke("REACH_CONNECTION_RESPONSE", node.Value);
+#if DEGUB
+                                        Log?.Invoke("REACH_CONNECTION_RESPONSE", node.Value);
+#endif
                                         break;
                                     }
                                 case Act.KEY_RESPONSE:
@@ -282,20 +296,26 @@ namespace GPeerToPeer.Client
                                         byte[] keyBytes = new byte[PTPNode.PTP_NODE_KEY_SIZE];
                                         Array.ConstrainedCopy(buffer, 1, keyBytes, 0, keyBytes.Length);
                                         packets[Act.KEY_RESPONSE].Add(keyBytes);
-                                        //Log?.Invoke("KEY_RESPONSE", node.Value);
+#if DEGUB
+                                        Log?.Invoke("KEY_RESPONSE", node.Value);
+#endif
                                         break;
                                     }
                                 case Act.FIX:
                                     {
                                         if (!nodes.Contains(node.Value))
                                             nodes.Add(node.Value);
-                                        //Log?.Invoke("FIX", node.Value);
+#if DEGUB
+                                        Log?.Invoke("FIX", node.Value);
+#endif
                                         break;
                                     }
                                 case Act.CLOSE:
                                     {
                                         nodes.Delete(node.Value);
-                                        //Log?.Invoke("CLOSE", node.Value);
+#if DEGUB
+                                        Log?.Invoke("CLOSE", node.Value);
+#endif
                                         break;
                                     }
                             }

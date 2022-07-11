@@ -15,7 +15,9 @@
         public event ProcessMessageFromHandler ReceiveMessageFrom;
 
         public delegate void LogPacketHandler(string message, PTPNode node);
+#if DEGUB
         public event LogPacketHandler Log;
+#endif
         public void Work();
     }
 }

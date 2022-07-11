@@ -15,18 +15,22 @@ namespace TestPTP
             InitializeComponent();
             client = new PTPClient("194.61.3.168", 22345, 22345);
             client.ReceiveMessageFrom += Client_ReceiveMessageFrom;
+#if DEBUG
             client.Log += Client_Log;
+#endif
             HistoryTB.Text += client.selfNode.Key + "\n";
             Closed += MainWindow_Closed;
             Task.Run(client.Work);
         }
 
+#if DEBUG
         private void Client_Log(string message, PTPNode node)
         {
             HistoryTB.Dispatcher.Invoke(() => {
                 WriteToEndHistory(string.Format("{0} - {1}", DateTime.Now.ToString("HH:mm:ss"), message));
             });
         }
+#endif
 
         private void MainWindow_Closed(object? sender, EventArgs e)
         {
