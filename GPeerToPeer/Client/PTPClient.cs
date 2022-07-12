@@ -361,7 +361,7 @@ namespace GPeerToPeer.Client
             socket.Close();
         }
 
-        public bool ReceiveMessageFrom(ref PTPNode node, ref byte[] message, byte channel = 0)
+        public bool ReceiveMessageFrom(out PTPNode node, out byte[] message, byte channel = 0)
         {
             (byte[], PTPNode) pair = (null, new PTPNode());
             if(receivedMessages[channel].GetNoWait(ref pair))
@@ -370,10 +370,12 @@ namespace GPeerToPeer.Client
                 node = pair.Item2;
                 return true;
             }
+            node = new PTPNode();
+            message = null;
             return false;
         }
 
-        public bool ReceiveMessageWithoutConfirmationFrom(ref PTPNode node, ref byte[] message, byte channel = 0)
+        public bool ReceiveMessageWithoutConfirmationFrom(out PTPNode node, out byte[] message, byte channel = 0)
         {
             (byte[], PTPNode) pair = (null, new PTPNode());
             if (receivedMessagesWithoutConfirmation[channel].GetNoWait(ref pair))
@@ -382,6 +384,8 @@ namespace GPeerToPeer.Client
                 node = pair.Item2;
                 return true;
             }
+            node = new PTPNode();
+            message = null;
             return false;
         }
     }

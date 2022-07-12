@@ -11,8 +11,8 @@
         public void SendMessageWithoutConfirmationTo(PTPNode node, byte[] message, byte channel = 0);
         public Task<bool> SendMessageToAsync(PTPNode node, byte[] message, byte channel = 0);
 
-        public bool ReceiveMessageFrom(ref PTPNode node, ref byte[] message, byte channel = 0);
-        public bool ReceiveMessageWithoutConfirmationFrom(ref PTPNode node, ref byte[] message, byte channel = 0);
+        public bool ReceiveMessageFrom(out PTPNode node, out byte[] message, byte channel = 0);
+        public bool ReceiveMessageWithoutConfirmationFrom(out PTPNode node, out byte[] message, byte channel = 0);
         public void Close();
 
         public delegate void LogPacketHandler(string message, PTPNode node);

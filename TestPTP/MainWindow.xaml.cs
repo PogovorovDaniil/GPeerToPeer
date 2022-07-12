@@ -50,14 +50,12 @@ namespace TestPTP
 
         private void Client_ReceiveMessageFrom(object? sender, EventArgs e)
         {
-            byte[] message = null;
-            PTPNode node = new PTPNode();
-            while (client.ReceiveMessageFrom(ref node, ref message))
+            while (client.ReceiveMessageFrom(out PTPNode node, out byte[] message))
             {
                 WriteToEndHistory(string.Format("{0}: {1}", node.Key, Encoding.UTF8.GetString(message)));
             }
 
-            while (client.ReceiveMessageWithoutConfirmationFrom(ref node, ref message))
+            while (client.ReceiveMessageWithoutConfirmationFrom(out PTPNode node, out byte[] message))
             {
                 WriteToEndHistory(string.Format("RAW {0}: {1}", node.Key, Encoding.UTF8.GetString(message)));
             }
