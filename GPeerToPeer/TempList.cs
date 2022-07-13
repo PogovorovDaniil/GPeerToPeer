@@ -92,6 +92,15 @@
             }
         }
 
+        public int Count()
+        {
+            lock (valuesLock)
+            {
+                DeleteOldValues();
+                return values.Count;
+            }
+        }
+
         public void Foreach(Action<T> action) 
         {
             lock (valuesLock)

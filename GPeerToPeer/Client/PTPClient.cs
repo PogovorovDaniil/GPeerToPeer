@@ -7,7 +7,7 @@ namespace GPeerToPeer.Client
     public class PTPClient : IPTPClient
     {
         private const int MAX_MESSAGE_SIZE = 1024;
-        private const int BUFFER_SIZE = MAX_MESSAGE_SIZE + 8 + 1;
+        private const int BUFFER_SIZE = MAX_MESSAGE_SIZE + 8 + 2;
         private const int PACKETS_TO_FIX = 1;
         private const int SOCKET_TIMEOUT = 2000;
         private const int SOCKET_TIMES_OUT = 5;
@@ -263,6 +263,7 @@ namespace GPeerToPeer.Client
                                         byte[] message = new byte[buffer.Length - 2];
                                         byte channel = buffer[1];
                                         Array.ConstrainedCopy(buffer, 2, message, 0, message.Length);
+                                        if (receivedMessagesWithoutConfirmation[channel].Count() > 100) break;
                                         receivedMessagesWithoutConfirmation[channel].Add((message, node.Value));
 #if DEBUG
                                         Log?.Invoke("SEND_NO_RECEIVE", node.Value);
